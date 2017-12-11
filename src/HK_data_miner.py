@@ -1,7 +1,6 @@
 # -*- coding:utf-8 -*- 
 from bs4 import BeautifulSoup
 from src.util import *
-from src.repeatTimer import *
 from functools import partial
 
 import numpy as np
@@ -20,9 +19,6 @@ class HK_data_miner():
 	_viewgenerator = ''
 	_eventvalidation = ''
 	market_type_list = ['sz', 'sh']
-
-	_detail_downloaded = False
-	_detail_downloaded_count = 0
 
 	def get_current_data(self):
 
@@ -196,13 +192,8 @@ class HK_data_miner():
 				open(archive_path, "wb").write(open(fullpath, "rb").read())
 				os.remove(fullpath)
 
-				self._detail_downloaded_count = self._detail_downloaded_count + 1
-
 				print(fullpath, "write to database")
 				pass
-
-		if self._detail_downloaded_count == 2:
-			self._detail_downloaded = True
 
 
 

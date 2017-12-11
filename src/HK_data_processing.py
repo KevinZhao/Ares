@@ -24,7 +24,7 @@ class HK_data_processing():
 		code = no_to_code(no)
 		
 		#选出持仓金额 = 0 的股票代码
-		resultProxy= _db.execute(
+		resultProxy= self._db.execute(
 		    text('select * from tb_daily where no = :no and amount = :amount order by date DESC'), {'no':no, 'amount': 0})
 		result_list = resultProxy.fetchall()
 		
@@ -37,7 +37,7 @@ class HK_data_processing():
 			#print('date, volume', date, volume)
 			
 			#检索tb_history_price该日收盘价格
-			resultProxy_price = _db.execute(
+			resultProxy_price = self._db.execute(
 				text('select close from tb_history_price where code = :code and date = :date'), {'code':code, 'date':date})
 			close = resultProxy_price.fetchall()
 
@@ -51,7 +51,7 @@ class HK_data_processing():
 			#当日无收盘价格，停盘状态
 			else:    
 				#检索停牌前市值总额
-				resultProxy= _db.execute(
+				resultProxy= self._db.execute(
 				    text('select * from tb_daily where no = :no and amount != 0 and date < :date order by date DESC'), {'no':no, 'date': date})
 				result_list = resultProxy.fetchone()
 				
@@ -61,7 +61,7 @@ class HK_data_processing():
 				
 				#无数据，则检索历史价格，检索停牌前最后一天的价格
 				if amount == 0:
-					resultProxy_price = _db.execute(
+					resultProxy_price = self._db.execute(
 				    	text('select * from tb_history_price where code = :code and date < :date order by date DESC'), {'code':code, 'date': date})
 					result_price = resultProxy_price.fetchone()
 				    
@@ -74,7 +74,7 @@ class HK_data_processing():
 
 			#更新数据库
 			if amount != 0:
-				update_db = _db.execute(
+				update_db = self._db.execute(
 					text('update tb_daily set Amount = :amount where no =:no and date=:date'),{'amount':amount,'no':no, 'date':date})
 
 		pass
@@ -85,7 +85,7 @@ class HK_data_processing():
 		code = no_to_code(no)
 		
 		#选出持仓金额 = 0 的股票代码
-		resultProxy= _db.execute(
+		resultProxy= self._db.execute(
 			text('select * from tb_daily where no = :no and amount_diff is null order by date DESC'), {'no':no})
 		result_list = resultProxy.fetchall()
 
@@ -97,7 +97,7 @@ class HK_data_processing():
 			volume_current = result_list[i][3]
 
 			#上一个交易日持仓数
-			resultProxy_previous= _db.execute(
+			resultProxy_previous= self._db.execute(
 				text('select * from tb_daily where no = :no and date <:date order by date DESC'), {'no':no, 'date':date})
 			result_previous_list = resultProxy_previous.fetchall()
 
@@ -113,7 +113,7 @@ class HK_data_processing():
 			#持股差值不为0，则
 			else:
 				#检索tb_history_price该日收盘价格
-				resultProxy_price = _db.execute(
+				resultProxy_price = self._db.execute(
 					text('select close from tb_history_price where code = :code and date = :date'), {'code':code, 'date':date})
 				close = resultProxy_price.fetchall()
 
@@ -127,7 +127,7 @@ class HK_data_processing():
 				#当日无收盘价格，停盘状态
 				else:    
 					#检索停牌前持股数
-					resultProxy= _db.execute(
+					resultProxy= self._db.execute(
 					    text('select * from tb_daily where no = :no and amount_diff is not null and date < :date order by date DESC'), {'no':no, 'date': date})
 					volume_result_list = resultProxy.fetchone()
 					
@@ -141,7 +141,7 @@ class HK_data_processing():
 			
 			#更新数据库
 			if amount_diff != None:
-				update_db = _db.execute(
+				update_db = self._db.execute(
 					text('update tb_daily set Amount_diff = :amount_diff where no =:no and date=:date'),{'amount_diff':amount_diff,'no':no, 'date':date})
 
 		pass
@@ -149,11 +149,13 @@ class HK_data_processing():
 	#全部更新
 	def update_HK_detail(self):
 
+		print('starting update_HK_detail')
+
 		#清空价格数据
 		self.delete_history_data()
 
 		#港股通代码转换
-		resultProxy = _db.execute(text('select distinct no from tb_daily'))
+		resultProxy = self._db.execute(text('select distinct no from tb_daily'))
 		no_result = resultProxy.fetchall()
 		result_array= []
 
@@ -165,17 +167,18 @@ class HK_data_processing():
 			code = no_to_code(no[0])
 		    
 			ts_adatper.update_history_price(code)
-
-			print('processing code:', no[0])
+			
 			self.update_amount(no[0])
 			self.update_amount_diff(no[0])
+
+		print('update_HK_detail is done')
 
 		pass
 
 	#删除历史价格表
 	def delete_history_data(self):
 	    
-		resultProxy = _db.execute(text('TRUNCATE tb_history_price'))
+		resultProxy = self._db.execute(text('TRUNCATE tb_history_price'))
 		print('all history price had been removed')
 
 		pass

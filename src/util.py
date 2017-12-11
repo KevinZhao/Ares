@@ -10,6 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy import text
 import tushare as ts
 import csv
+import json
 
 ''' ---------返回当地时间-----------------------------------------'''
 def local_time():
@@ -78,7 +79,9 @@ class Jiatou_DB(object):
         _db = None
         
         def __init__(self): 
-            self._db = create_engine('mysql://jiatou:Kevin8093.@www.zhaoxiangyu.com/jiatou?charset=utf8')
+            with open('src/Jiatou.cnf') as json_data:
+                cnf = json.load(json_data)                
+                self._db = create_engine(cnf['db'])
 
 
 
