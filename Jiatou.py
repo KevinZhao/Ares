@@ -5,6 +5,8 @@ from src.Tushare_adapter import *
 from src.HK_data_processing import *
 import time
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.blocking import BlockingScheduler
+
 
 def get_HK_detail():
 
@@ -27,13 +29,15 @@ def get_HK_amount_top():
 miner = HK_data_miner()
 sched = BackgroundScheduler()
 
-#周二至周六对应 1点执行 获取每日持仓情况, 执行一次
+#周二至周六对应 3点执行 获取每日持仓情况, 执行一次
 sched.add_job(
 	get_HK_detail, 'cron', 
-	hour='1', 
+	hour='03', 
+	minute='00', 
 	day_of_week ='2-6', 
 	timezone = 'Asia/Shanghai')
 
+'''
 #周一至周五对应 日9点半至11点半，13点至15点，获取资金流入流出，每秒执行一次
 sched.add_job(
 	get_HK_amount_flow, 'cron', 
@@ -48,7 +52,12 @@ sched.add_job(
 	hour='5', 
 	minute='40-45', 
 	timezone = 'Asia/Shanghai')
+'''
 
 sched.start()
+
+print("Running")
+while True:
+	time.sleep(1)
 
 
