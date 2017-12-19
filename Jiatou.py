@@ -6,6 +6,7 @@ from src.util import *
 from src.Tushare_adapter import *
 from src.HK_data_processing import *
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.blocking import BlockingScheduler
 
 def get_HK_detail():
 
@@ -27,7 +28,7 @@ def get_HK_amount_top():
 
 def jiatou():
 	miner = HK_data_miner()
-	sched = BackgroundScheduler()
+	sched = BlockingScheduler()
 
 	#周二至周六对应 3点执行 获取每日持仓情况, 执行一次
 	sched.add_job(
@@ -36,8 +37,7 @@ def jiatou():
 		minute='00', 
 		day_of_week ='1-6', 
 		timezone = 'Asia/Shanghai')
-
-	'''	
+	'''
 	#周一至周五对应 日9点半至11点半，13点至15点，获取资金流入流出，每秒执行一次
 	sched.add_job(
 		get_HK_amount_flow, 'cron', 
@@ -46,7 +46,6 @@ def jiatou():
 		second = '0-59', 
 		timezone = 'Asia/Shanghai')
 
-	
 	#周一至周五对应 日5点40分，获取资金流入流出，执行一次
 	sched.add_job(
 		get_HK_amount_top, 'cron', 
@@ -54,7 +53,6 @@ def jiatou():
 		minute='40-45', 
 		timezone = 'Asia/Shanghai')
 	'''
-
 	sched.start()
 
 def log(log_str):
