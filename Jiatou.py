@@ -6,9 +6,10 @@ from src.util import *
 from src.Tushare_adapter import *
 from src.HK_data_processing import *
 from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.schedulers.blocking import BlockingScheduler
 
 def get_HK_detail():
+
+	miner = HK_data_miner()
 
 	#download
 	miner.get_current_data()
@@ -27,13 +28,13 @@ def get_HK_amount_top():
 	print('get_HK_amount_flow not implemented')
 
 def jiatou():
-	miner = HK_data_miner()
-	sched = BlockingScheduler()
+	
+	sched = BackgroundScheduler()
 
 	#周二至周六对应 3点执行 获取每日持仓情况, 执行一次
 	sched.add_job(
 		get_HK_detail, 'cron', 
-		hour='03', 
+		hour='05', 
 		minute='00', 
 		day_of_week ='1-6', 
 		timezone = 'Asia/Shanghai')
@@ -55,9 +56,12 @@ def jiatou():
 	'''
 	sched.start()
 
+	while True:
+ 		time.sleep(1)
+
 def log(log_str):
 
-	fd = open('/tmp/demone.log', 'w')
+	fd = open('/tmp/Ares.log', 'w')
 	
 	while True:
 		fd.write(log_str + '\n')
@@ -78,7 +82,7 @@ def createDaemon():
 		os._exit(1)
 
 	# it separates the son from the father
-	os.chdir('/')
+	os.chdir('/root/Ares/')
 	os.setsid()
 	os.umask(0)
 

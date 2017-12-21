@@ -29,22 +29,22 @@ class HK_data_miner():
 
 		for market_type in self.market_type_list:
 
-		    url = "http://sc.hkexnews.hk/TuniS/www.hkexnews.hk/sdw/search/mutualmarket_c.aspx?t=" + market_type
-		    response = urllib.request.urlopen(url)
-		    result = response.read().decode('utf-8')
-		    
-		    current_time = local_time()
+			url = "http://sc.hkexnews.hk/TuniS/www.hkexnews.hk/sdw/search/mutualmarket_c.aspx?t=" + market_type
+			response = urllib.request.urlopen(url)
+			result = response.read().decode('utf-8')
 
-		    yesterday = (current_time - datetime.timedelta(days = 1))
-		    
-		    file_date = time.strftime('%Y%m%d', yesterday.timetuple())
-		    filename = "data/"+ market_type + file_date + ".csv"
-		    hold_date = time.strftime('%d%m%Y', yesterday.timetuple())
+			current_time = local_time()
 
-		    self.save_to_csv(result, filename, hold_date)
-		    self._viewstate, self._viewgenerator, self._eventvalidation = self.store_view_para(result)
+			yesterday = (current_time - datetime.timedelta(days = 1))
 
-		    pass
+			file_date = time.strftime('%Y%m%d', yesterday.timetuple())
+			filename = "data/"+ market_type + file_date + ".csv"
+			hold_date = time.strftime('%d%m%Y', yesterday.timetuple())
+
+			self.save_to_csv(result, filename, hold_date)
+			self._viewstate, self._viewgenerator, self._eventvalidation = self.store_view_para(result)
+
+			pass
 
 	def get_history_data(self):
 
