@@ -59,16 +59,6 @@ def jiatou():
 	while True:
  		time.sleep(1)
 
-def log(log_str):
-
-	fd = open('/tmp/Ares.log', 'w')
-	
-	while True:
-		fd.write(log_str + '\n')
-		fd.flush()
-		time.sleep(2)
-	fd.close()
-
 def createDaemon():    
 
 	# create - fork 1

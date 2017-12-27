@@ -60,6 +60,15 @@ def name_to_code(name):
 
     return code
 
+def log(log_str):
+
+    fd = open('/tmp/Ares.log', 'w')
+    
+    while True:
+        fd.write(log_str + '\n')
+        fd.flush()
+        time.sleep(2)
+    fd.close()
 
 
 class Singleton(type):
