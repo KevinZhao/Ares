@@ -17,63 +17,91 @@ from src.Tushare_adapter import *
 class HK_data_processing():
 	_name = 'HK_data_processing'
 	_db = Jiatou_DB()._db
+	_tb_daily = {
+				'id':0, 
+				'No':1,
+				'Name':2,
+				'Volume':3,
+				'Percent':4,
+				'Amount_diff':5,
+				'Amount':6,
+				'Date':7}
+
+	_tb_histoy_price = {
+				'date':0,
+				'open':1,
+				'close':2,
+				'high':3,
+				'low':4,
+				'volume':5,
+				'code':6
+				}
 
 	#更新当日持仓金额
 	def update_amount(self, no):
 
 		code = no_to_code(no)
 		
-		#选出持仓金额 = 0 的股票代码
+		#选出持仓金额需要更新(amount is null) 的股票代码
 		resultProxy= self._db.execute(
-		    text('select * from tb_daily where no = :no and amount = :amount order by date DESC'), {'no':no, 'amount': 0})
+		    text('select * from tb_daily where no = :no and amount is null order by date DESC'), {'no':no})
 		result_list = resultProxy.fetchall()
 		
-		amount = 0
+		amount = None
 
 		for result in result_list:
 		
-			date = result[7]
-			volume = result[3]
-			#print('date, volume', date, volume)
+			date = result[self._tb_daily['Date']]
+			volume = result[self._tb_daily['Volume']]
 			
 			#检索tb_history_price该日收盘价格
 			resultProxy_price = self._db.execute(
-				text('select close from tb_history_price where code = :code and date = :date'), {'code':code, 'date':date})
+				text('select * from tb_history_price where code = :code and date = :date'), {'code':code, 'date':date})
 			close = resultProxy_price.fetchall()
 
-			#print('close', close)
-			
-			if (len(close) == 1):
-				close = close[0][0]
+			#该交易日如果有数据，交易状态
+			if (len(close) != 0):
+				close = close[0][self._tb_histoy_price['close']]
 				amount = volume * close
-				#print(amount)
 
-			#当日无收盘价格，停盘状态
+			#该交易日如没有数据，停盘状态
 			else:    
-				#检索停牌前市值总额
+				#检索停牌前港资市值总额
 				resultProxy= self._db.execute(
 				    text('select * from tb_daily where no = :no and amount != 0 and date < :date order by date DESC'), {'no':no, 'date': date})
 				result_list = resultProxy.fetchone()
 				
-				#有数据且持股数相等，则用停牌前最后一天的市值
-				if result_list != None and result_list[3] == volume:
-				    amount = result_list[4]
-				
-				#无数据，则检索历史价格，检索停牌前最后一天的价格
-				if amount == 0:
+				#港资持仓有数据
+				if result_list != None:
+
+					#持股数相等，则用停牌前最后一天的市值
+					if result_list[self._tb_daily['Volume']] == volume:
+						amount = result_list[self._tb_daily['Amount']]
+
+				    #持股数不等，可能：停牌期间送转
+					else:
+						amount = 0
+						print('implementation not completed, error 001', code, date)
+
+				#港资持仓无数据
+				else:
+					#则检索历史价格，检索停牌前最后一天的价格
 					resultProxy_price = self._db.execute(
-				    	text('select * from tb_history_price where code = :code and date < :date order by date DESC'), {'code':code, 'date': date})
+						text('select * from tb_history_price where code = :code and date < :date order by date DESC'), {'code':code, 'date': date})
 					result_price = resultProxy_price.fetchone()
-				    
+
+					#有历史交易数据
 					if result_price != None:
-						close = result_price[3]
+						close = result_price[self._tb_histoy_price['close']]
 						amount = volume * close
 
+					#无历史交易数据
 					else:
-						print('there is something wrong with amount ', code, date)
+						amount = 0
+						print('implementation not completed, error 002', code, date)
 
 			#更新数据库
-			if amount != 0:
+			if amount != None:
 				update_db = self._db.execute(
 					text('update tb_daily set Amount = :amount where no =:no and date=:date'),{'amount':amount,'no':no, 'date':date})
 
@@ -84,27 +112,35 @@ class HK_data_processing():
 
 		code = no_to_code(no)
 		
-		#选出持仓金额 = 0 的股票代码
+		#选出需要更新(amount is null) 的股票代码
 		resultProxy= self._db.execute(
 			text('select * from tb_daily where no = :no and amount_diff is null order by date DESC'), {'no':no})
 		result_list = resultProxy.fetchall()
 
-		result_count = len(result_list)
-		for i in range(0, result_count - 1):
+		#遍历更新Amount_diff
+		for result in result_list:
 		
 			amount_diff = None
-			date = result_list[i][7]
-			volume_current = result_list[i][3]
 
-			#上一个交易日持仓数
+			#当前交易日持仓股数
+			date = result[self._tb_daily['Date']]
+			volume_current = result[self._tb_daily['Volume']]
+
+			#历史上一个交易日持仓数
 			resultProxy_previous= self._db.execute(
 				text('select * from tb_daily where no = :no and date <:date order by date DESC'), {'no':no, 'date':date})
 			result_previous_list = resultProxy_previous.fetchall()
 
-			volume_previous = result_previous_list[0][3]
-			volume_diff = volume_current - volume_previous
+			#存在历史上一个交易日数据
+			if len(result_previous_list) != 0:
+				volume_previous = result_previous_list[0][self._tb_daily['Volume']]
+			
+				#持仓数差额
+				volume_diff = volume_current - volume_previous
 
-			#print('date, volume_current, volume_previous, volume_diff', date, volume_current, volume_previous, volume_diff)
+			#不存在历史上一个交易日数据，新建仓，2017年3月17日
+			else:
+				volume_diff = volume_current
 			
 			#持股差值为0，增量为0
 			if volume_diff == 0:
@@ -114,36 +150,22 @@ class HK_data_processing():
 			else:
 				#检索tb_history_price该日收盘价格
 				resultProxy_price = self._db.execute(
-					text('select close from tb_history_price where code = :code and date = :date'), {'code':code, 'date':date})
+					text('select * from tb_history_price where code = :code and date = :date'), {'code':code, 'date':date})
 				close = resultProxy_price.fetchall()
 
 				#当日有收盘价格，交易状态
-				if (len(close) == 1):
-					close = close[0][0]
+				if (len(close) != 0):
+					close = close[0][self._tb_histoy_price['close']]
 					amount_diff = volume_diff * close
-
-					#print(close, amount_diff)
 
 				#当日无收盘价格，停盘状态
 				else:    
-					#检索停牌前持股数
-					resultProxy= self._db.execute(
-					    text('select * from tb_daily where no = :no and amount_diff is not null and date < :date order by date DESC'), {'no':no, 'date': date})
-					volume_result_list = resultProxy.fetchone()
-					
-					#有数据且持股数相等，则增量为0，#todo delete this one
-					if volume_result_list != None and volume_result_list[3] == volume_current:
-					    amount_diff = 0
+					amount_diff = 0
 
-					#停牌期间送股
-					if amount_diff == None:
-						print('there is something wrong with amount diff, ', code, date)
-			
 			#更新数据库
 			if amount_diff != None:
 				update_db = self._db.execute(
 					text('update tb_daily set Amount_diff = :amount_diff where no =:no and date=:date'),{'amount_diff':amount_diff,'no':no, 'date':date})
-
 		pass
 
 	#全部更新
