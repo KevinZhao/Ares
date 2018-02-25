@@ -7,37 +7,103 @@ from src.Tushare_adapter import *
 from src.HK_data_processing import *
 from apscheduler.schedulers.background import BackgroundScheduler
 
-def get_HK_detail():
+def get_holding_data():
 
 	miner = HK_data_miner()
 
-	#download
-	miner.get_current_data()
-	miner.write_to_mysqldb()
-
-	#update
-	data_proc = HK_data_processing()
-	data_proc.update_HK_detail()
+	try:
+		#download
+		miner.get_holding_data()
+		miner.write_holding_data_mysqldb()
+	
+	except Exception as e:
+		log(e)
 
 	pass
 
+def get_detail_data():
+
+	miner = HK_data_miner()
+
+	try:
+		#download
+		miner.get_detail_data()		
+	
+	except Exception as e:
+		log(e)
+
+	pass
+
+
+def update_holding_data():
+
+	data_proc = HK_data_processing()
+
+	try:
+		#update volume and amount information
+		data_proc.update_holding_detail()
+	
+	except Exception as e:
+		log(e)
+
+	pass
+
+def test_get_holding_data():
+
+	miner = HK_data_miner()
+
+	try:
+		#download
+		miner.get_holding_data_history('20170317', '20180225')
+		miner.write_holding_data_mysqldb()
+	
+	except Exception as e:
+		log(e)
+
+	data_proc = HK_data_processing()
+
+	try:
+		#update volume and amount information
+		data_proc.update_holding_detail()
+	
+	except Exception as e:
+		log(e)
+
+	pass
+
+
 def get_HK_amount_flow():
-	print('get_HK_amount_flow not implemented')
+	log('get_HK_amount_flow not implemented')
 
 def get_HK_amount_top():
-	print('get_HK_amount_flow not implemented')
+	log('get_HK_amount_top not implemented')
 
 def jiatou():
 	
+	scheduleTask()
+
+	#test_get_holding_data()
+
+def scheduleTask():
+
 	sched = BackgroundScheduler()
 
-	#周二至周六对应 3点执行 获取每日持仓情况, 执行一次
+	#周二至周六对应 5点执行 获取每日持仓数量情况，每日执行一次
 	sched.add_job(
-		get_HK_detail, 'cron', 
+		get_holding_data, 'cron', 
 		hour='05', 
 		minute='00', 
 		day_of_week ='1-6', 
 		timezone = 'Asia/Shanghai')
+
+	#周二至周六对应 5点15分执行 获取每日持仓数量明细情况，每日执行一次
+	sched.add_job(
+		update_holding_data, 'cron', 
+		hour='5', 
+		minute='15', 
+		day_of_week ='1-6', 
+		timezone = 'Asia/Shanghai')
+
 	'''
 	#周一至周五对应 日9点半至11点半，13点至15点，获取资金流入流出，每秒执行一次
 	sched.add_job(
@@ -47,17 +113,19 @@ def jiatou():
 		second = '0-59', 
 		timezone = 'Asia/Shanghai')
 
-	#周一至周五对应 日5点40分，获取资金流入流出，执行一次
+	#周一至周五对应 日5点40分，获取资金流入流出，，每秒执行一次
 	sched.add_job(
 		get_HK_amount_top, 'cron', 
 		hour='5', 
 		minute='40-45', 
+		second = '0-59', 
 		timezone = 'Asia/Shanghai')
 	'''
 	sched.start()
 
 	while True:
  		time.sleep(1)
+
 
 def createDaemon():    
 
@@ -68,11 +136,11 @@ def createDaemon():
 		
 	except OSError as error:
 		
-		print('fork #1 failed: %d (%s)' % (error.errno, error.strerror))
+		log('fork #1 failed: %d (%s)' % (error.errno, error.strerror))
 		os._exit(1)
 
 	# it separates the son from the father
-	os.chdir('/root/Ares/')
+	os.chdir('/root/Ares/') #todo: change to /
 	os.setsid()
 	os.umask(0)
 
@@ -80,10 +148,10 @@ def createDaemon():
 	try:
 		pid = os.fork()
 		if pid > 0:
-			print('Daemon PID %d' % pid)
+			log('Daemon PID %d' % pid)
 			os._exit(0)
 	except OSError as error:
-		print('fork #2 failed: %d (%s)' % (error.errno, error.strerror))
+		log('fork #2 failed: %d (%s)' % (error.errno, error.strerror))
 		os._exit(1)
 
 	jiatou()
@@ -91,3 +159,4 @@ def createDaemon():
 if __name__ == '__main__':
 
 	createDaemon()
+	#get_HK_detail_history()

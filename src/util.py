@@ -62,12 +62,15 @@ def name_to_code(name):
 
 def log(log_str):
 
-    fd = open('/tmp/Ares.log', 'w')
-    
-    while True:
-        fd.write(log_str + '\n')
-        fd.flush()
-        time.sleep(2)
+    fd = open('Ares.log', 'r')
+    fd.flush()
+    log = fd.read()
+    fd.close()
+
+    fd = open('Ares.log', 'w')
+
+    fd.write(log + log_str + '\n')
+    fd.flush()
     fd.close()
 
 

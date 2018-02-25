@@ -81,7 +81,7 @@ class HK_data_processing():
 				    #持股数不等，可能：停牌期间送转
 					else:
 						amount = 0
-						print('implementation not completed, error 001', code, date)
+						#log('implementation not completed, error 001 %s %s' % code , date)
 
 				#港资持仓无数据
 				else:
@@ -98,7 +98,7 @@ class HK_data_processing():
 					#无历史交易数据
 					else:
 						amount = 0
-						print('implementation not completed, error 002', code, date)
+						#log('implementation not completed, error 002 %s %s' % code , date)
 
 			#更新数据库
 			if amount != None:
@@ -169,9 +169,9 @@ class HK_data_processing():
 		pass
 
 	#全部更新
-	def update_HK_detail(self):
+	def update_holding_detail(self):
 
-		print('starting update_HK_detail')
+		log('starting update_holding_detail')
 
 		#清空价格数据
 		self.delete_history_data()
@@ -193,7 +193,7 @@ class HK_data_processing():
 			self.update_amount(no[0])
 			self.update_amount_diff(no[0])
 
-		print('update_HK_detail is done')
+		log('update_holding_detail is done')
 
 		pass
 
@@ -201,7 +201,7 @@ class HK_data_processing():
 	def delete_history_data(self):
 	    
 		resultProxy = self._db.execute(text('TRUNCATE tb_history_price'))
-		print('all history price had been removed')
+		log('all history price had been removed')
 
 		pass
 

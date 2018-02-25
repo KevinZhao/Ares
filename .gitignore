@@ -2,3 +2,5 @@
 *.cnf
 *.csv
 *.pyc
+*.log
+.ipynb_checkpoints/Untitled-checkpoint.ipynb
