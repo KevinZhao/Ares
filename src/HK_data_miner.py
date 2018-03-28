@@ -5,13 +5,13 @@ from functools import partial
 
 import numpy as np
 import pandas as pd
-import urllib.request
 import time
 import datetime
 import re
 import os
 import os.path
 import shutil
+import json
 
 class HK_data_miner():
 	_name = 'HK_data_miner'
@@ -20,46 +20,59 @@ class HK_data_miner():
 	_eventvalidation = ''
 	_db = Jiatou_DB()._db
 	market_type_list = ['sz', 'sh']
+	_sleep_timer = 12
+	_retry_count = 5
 
 	#---For Holding Data-----#
 
 	def get_holding_data(self, holding_date = None):
 
-		log('get_holding_data called')
+		log('get_holding_data called %s' % holding_date)
 
-    	#获取当日数据
+		#formate date 
+		if holding_date != None :
+			date_struct = time.strptime(holding_date, "%Y%m%d")
+			date = datetime.datetime(* date_struct[:6])
+		else:
+			current_time = local_time()
+			date = (current_time - datetime.timedelta(days = 1))
+
+		history_y = time.strftime('%Y', date.timetuple());
+		history_m = time.strftime('%m', date.timetuple());
+		history_d = time.strftime('%d', date.timetuple());
+		hold_date = time.strftime('%d%m%Y', date.timetuple())
+		week_day = time.strftime("%w", date.timetuple())
+
+		#周日，周一不取数据
+		if (int(week_day) <= 0) or (int(week_day)) >= 6:
+			return
+
+		json_file = open("day_list.json", encoding='utf-8')
+		day_list = json.load(json_file)
+
+		#法定节假日不取数据
+		for day in day_list['day_list']:
+			if day == holding_date:
+				log('get_holding_data return as holding_date in day_list %s' % holding_date)
+				return
+
+    	#获取页面参数，防止session过期
 		result = ''
 
-		if self._viewstate == '':
+		url = "http://sc.hkexnews.hk/TuniS/www.hkexnews.hk/sdw/search/mutualmarket_c.aspx?t=sh"
+		parameters = []
+		result = url_request_with_retry(url, parameters, self._retry_count, self._sleep_timer)
 
-			url = "http://sc.hkexnews.hk/TuniS/www.hkexnews.hk/sdw/search/mutualmarket_c.aspx?t=sz"
-			response = urllib.request.urlopen(url)
-			result = response.read().decode('utf-8')
+		if result != '':
 			self._viewstate, self._viewgenerator, self._eventvalidation = self.store_view_para(result)
+		else:
+			self.get_holding_data(holding_date)
 
 		for market_type in self.market_type_list:
 
 			url = "http://sc.hkexnews.hk/TuniS/www.hkexnews.hk/sdw/search/mutualmarket_c.aspx?t=" + market_type
 
-			#formate date 
-			if holding_date != None :
-				date_struct = time.strptime(holding_date, "%Y%m%d")
-				date = datetime.datetime(* date_struct[:6])
-			else:
-				current_time = local_time()
-				date = (current_time - datetime.timedelta(days = 1))
-
-			history_y = time.strftime('%Y', date.timetuple());
-			history_m = time.strftime('%m', date.timetuple());
-			history_d = time.strftime('%d', date.timetuple());
-			hold_date = time.strftime('%d%m%Y', date.timetuple())
-			week_day = time.strftime("%w", date.timetuple())
-
-			#周日，周一不取数据
-			if (int(week_day) <= 0) or (int(week_day)) >= 6:
-				return
-
-			values = {
+			parameters = {
 			    '__VIEWSTATE': self._viewstate,
 			    '__VIEWSTATEGENERATOR': self._viewgenerator,
 			    '__EVENTVALIDATION':self._eventvalidation,
@@ -71,18 +84,19 @@ class HK_data_miner():
 			    'btnSearch.y' :'12'
 			}
 
-			data = urllib.parse.urlencode(values) 
-			data = data.encode('ascii')
+			result = url_request_with_retry(url, parameters, self._retry_count, self._sleep_timer)
 
-			request = urllib.request.Request(url, data, method='POST')
-			response = urllib.request.urlopen(request, data)
-			result = response.read().decode('utf-8')
+			if result != '':
 
-			history_date = time.strftime('%Y%m%d', date.timetuple())
-			filename = "data/"+ market_type + history_date + ".csv"
+				history_date = time.strftime('%Y%m%d', date.timetuple())
+				filename = "data/"+ market_type + history_date + ".csv"
 
-			self.save_holding_data_csv(result, filename, hold_date)
-			self._viewstate, self._viewgenerator, self._eventvalidation = self.store_view_para(result)
+				self.save_holding_data_csv(result, filename, hold_date)
+				self._viewstate, self._viewgenerator, self._eventvalidation = self.store_view_para(result)
+
+			else:
+				print('failed and try again')
+				self.get_holding_data(holding_date)
 
 			pass
 
@@ -102,7 +116,10 @@ class HK_data_miner():
 
 			self.get_holding_data(date)
 
+			time.sleep(1)
+
 	def save_holding_data_csv(self, html, filename, hold_date):
+	    #log(html)
     
 	    df = pd.DataFrame(columns = ['No', 'Name', 'Volume', 'Percent'])
 	   
@@ -207,10 +224,11 @@ class HK_data_miner():
 		date_Ymd = time.strftime('%Y%m%d', date.timetuple());
 		result = ''
 
-		resultProxy = self._db.execute(text('select distinct no from tb_daily'))
+		resultProxy = self._db.execute(text('select distinct no from tb_daily where date =:date'), {'date':date_Ymd})
 		no_list = resultProxy.fetchall()
 
 		for no in no_list:
+			log(no[0])
 
 			#check if data already in the database
 			resultProxy = self._db.execute(
@@ -220,8 +238,8 @@ class HK_data_miner():
 			if len(result_list) == 0:
 
 				url = "http://sc.hkexnews.hk/TuniS/www.hkexnews.hk/sdw/search/searchsdw_c.aspx"
-				response = urllib.request.urlopen(url)
-				result = response.read().decode('utf-8')
+				parameters = []
+				result = url_request_with_retry(url, parameters, self._retry_count, self._sleep_timer)
 
 				self._viewstate, self._viewgenerator, self._eventvalidation = self.store_view_para(result)
 
@@ -229,7 +247,7 @@ class HK_data_miner():
 				ddlShareholdingMonth = time.strftime('%m', date.timetuple());
 				ddlShareholdingDay = time.strftime('%d', date.timetuple());
 
-				values = {
+				parameters = {
 				    '__VIEWSTATE': self._viewstate,
 				    '__VIEWSTATEGENERATOR': self._viewgenerator,
 				    '__EVENTVALIDATION':self._eventvalidation,
@@ -241,16 +259,11 @@ class HK_data_miner():
 				    'btnSearch.y' :'11'
 				}
 
-				data = urllib.parse.urlencode(values) 
-				data = data.encode('ascii')
+				result = url_request_with_retry(url, parameters, self._retry_count, self._sleep_timer)
 
-				request = urllib.request.Request(url, data, method='POST')
-				response = urllib.request.urlopen(request, data)
-				html = response.read().decode('utf-8')
-
-				filename = "detail_data/"+ no[0] + '_'+ date_Ymd + ".csv"
-
-				self.save_detail_data_csv(no[0], html, filename, date)
+				if result != '':
+					filename = "detail_data/"+ no[0] + '_'+ date_Ymd + ".csv"
+					self.save_detail_data_csv(no[0], result, filename, date)
 
 		pass
 
@@ -271,8 +284,6 @@ class HK_data_miner():
 			self.get_detail_data(date)
 
 	def save_detail_data_csv(self, no, html, filename, hold_date):
-
-		log('save_to_csv_detail called')
     
 		df = pd.DataFrame(columns = ['No', 'Holder', 'Name', 'Address','Volume', 'Percent', 'Date'])
 		hold_date_dmY = time.strftime('%d%m%Y', hold_date.timetuple())
@@ -281,12 +292,16 @@ class HK_data_miner():
 
 		#find td bgcolor="#F5F5F5"
 		td = soup.find('td', {"bgcolor":'#F5F5F5'})
-		td_child = td.findAll('td', {"class":'arial12black', "nowrap":'nowrap'}) 
+
+		try:
+			td_child = td.findAll('td', {"class":'arial12black', "nowrap":'nowrap'}) 
+		except AttributeError as e:
+			log(html)
+			return
+			
 
 		holding_date = td_child[1].string
 		holding_date = re.sub("\D", "", holding_date)
-
-		#print(holding_date, hold_date_dmY)
 
 		if holding_date != hold_date_dmY:
 		    return
@@ -335,13 +350,11 @@ class HK_data_miner():
 			#香港中央结算有限公司 Holder is null
 			if len(record) != 7:
 				record.insert(1, '')
-				print(record)
 
 			df.loc[df.shape[0]+1] = record
 	        
 		df = df.set_index('No')
 		df.to_csv(filename, encoding='gbk')
-		print('save to ', filename)
 	    
 		return
 
@@ -388,8 +401,23 @@ class HK_data_miner():
 
 				pass
 
-	#---Miner Util-----#
+	#---For amount flow-----#
+	def get_amount_flow(self):
 
+		log('get_amount_flow called')
+
+
+		url = "http://sc.hkex.com.hk/TuniS/www.hkex.com.hk/chi/csm/script/data_NBSZ_Turnover_chi.js"
+		parameters = {
+			    '_': '1521991397470'
+			}
+
+		result = url_request_with_retry(url, parameters, self._retry_count, self._sleep_timer)
+
+		print(result)
+
+
+	#---Miner Util-----#
 	def store_view_para(self, html):
     
 	    soup = BeautifulSoup(html, "html5lib")

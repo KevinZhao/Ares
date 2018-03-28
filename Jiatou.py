@@ -50,24 +50,27 @@ def update_holding_data():
 
 def test_get_holding_data():
 
-	miner = HK_data_miner()
+	#miner = HK_data_miner()
 
-	try:
+	#try:
 		#download
-		miner.get_holding_data_history('20170317', '20180225')
-		miner.write_holding_data_mysqldb()
-	
-	except Exception as e:
-		log(e)
+	#save_cookie('')
+	#miner.get_detail_data_history('20170328', '20170430')
 
-	data_proc = HK_data_processing()
-
-	try:
-		#update volume and amount information
-		data_proc.update_holding_detail()
+	#miner.get_amount_flow()
+	#miner.write_holding_data_mysqldb()
 	
-	except Exception as e:
-		log(e)
+	#except Exception as e:
+		#log(e)
+
+	#data_proc = HK_data_processing()
+
+	#try:
+	#update volume and amount information
+	#data_proc.update_holding_detail()
+	
+	#except Exception as e:
+	#	log(e)
 
 	pass
 
@@ -79,10 +82,12 @@ def get_HK_amount_top():
 	log('get_HK_amount_top not implemented')
 
 def jiatou():
+
+	clear_log()
 	
 	scheduleTask()
 
-	#test_get_holding_data()
+	test_get_holding_data()
 
 def scheduleTask():
 

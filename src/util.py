@@ -11,6 +11,10 @@ from sqlalchemy import text
 import tushare as ts
 import csv
 import json
+import urllib.request
+import urllib.error
+import random
+import socket
 
 ''' ---------返回当地时间-----------------------------------------'''
 def local_time():
@@ -62,6 +66,8 @@ def name_to_code(name):
 
 def log(log_str):
 
+    #print(log_str)
+
     fd = open('Ares.log', 'r')
     fd.flush()
     log = fd.read()
@@ -69,9 +75,138 @@ def log(log_str):
 
     fd = open('Ares.log', 'w')
 
-    fd.write(log + log_str + '\n')
+    fd.write(log + timestamp() + ' ' + log_str + '\n')
     fd.flush()
     fd.close()
+
+def clear_log():
+    fd = open('Ares.log', 'w')
+
+    fd.write('')
+    fd.flush()
+    fd.close()
+
+def save_cookie(cookie):
+
+    fd = open('cookie', 'w')
+
+    fd.write(cookie)
+    fd.flush()
+    fd.close()
+
+def read_cookie():
+
+    fd = open('cookie', 'r')
+
+    cookie = fd.read()
+    fd.close()
+
+    return cookie
+
+def url_request_with_retry(url, parameters, retry_count, sleep_count):
+
+    socket.setdefaulttimeout(15)
+    
+    attempts = 0
+    success = False
+    result = ''
+
+    data = urllib.parse.urlencode(parameters) 
+    data = data.encode('ascii')
+
+    while attempts <= retry_count and not success:
+
+        ua_list = [
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.6; rv2.0.1) Gecko/20100101 Firefox/4.0.1",
+            "Mozilla/5.0 (Windows NT 6.1; rv2.0.1) Gecko/20100101 Firefox/4.0.1",
+            "Opera/9.80 (Macintosh; Intel Mac OS X 10.6.8; U; en) Presto/2.8.131 Version/11.11",
+            "Opera/9.80 (Windows NT 6.1; U; en) Presto/2.8.131 Version/11.11",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_0) AppleWebKit/535.11 (KHTML, like Gecko) Chrome/17.0.963.56 Safari/535.11",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36"
+            ]
+        user_agent = random.choice(ua_list)
+
+        connection = "keep-alive"
+        host = "sc.hkexnews.hk"
+        cookie = read_cookie()
+
+        request = None
+        if len(parameters) == 0:
+            request = urllib.request.Request(url, data, method = 'GET')
+        else:
+            request = urllib.request.Request(url, data, method = 'POST')
+        request.add_header('User-Agent', user_agent)
+        
+        if cookie != "":
+            request.add_header('Cookie', cookie)
+
+        request.add_header('Connection', connection)
+        request.add_header('Host', host)
+
+        try:
+            #log(url)
+            response = urllib.request.urlopen(request, data)
+            result = response.read().decode('utf-8')
+            
+            cookie = ""
+
+            for header in response.getheaders():
+                if header[0] == 'Set-Cookie':
+                    cookie = cookie + header[1]+ ';'
+
+            response.close()
+
+            save_cookie(cookie)
+            success = True
+
+            time.sleep(sleep_count)
+
+        except urllib.error.HTTPError as e:
+            log('urllib.error.HTTPError')
+            log(str(e.code))
+            log(e.reason)
+
+            cookie = ''
+            save_cookie(cookie)
+
+            attempts += 1
+
+            continue
+        except ConnectionResetError as e:
+            log('ConnectionResetError')
+            attempts += 1
+
+        except urllib.error.URLError as e:
+            #TimeoutError, [Errno 110] Connection timed out
+            #log(e.reason)
+            #print(e)
+            log('urllib.error.URLError')
+            attempts += 1
+
+        except socket.timeout:
+            log('socket.timeout')
+            attempts += 1
+
+        except httplib.BadStatusLine as e:
+            log('http.client.BadStatusLine')
+            log(str(e))
+            attempts += 1
+
+        except Exception as e:
+
+            log(str(e))
+            attempts += 1
+
+        if attempts == retry_count + 1:
+            log('[Fatal Error]' + url)
+
+    return result
+
+def timestamp():
+    current_time = local_time()
+    timestamp = time.strftime('%Y%m%d_%H%M%S', current_time.timetuple())
+
+    return timestamp
 
 
 class Singleton(type):
@@ -94,6 +229,8 @@ class Jiatou_DB(object):
             with open('src/Jiatou.cnf') as json_data:
                 cnf = json.load(json_data)                
                 self._db = create_engine(cnf['db'])
+
+
 
 
 
