@@ -5,6 +5,7 @@ from src.HK_data_miner import *
 from src.util import *
 from src.Tushare_adapter import *
 from src.HK_data_processing import *
+from src.Lixinger_adapter import *
 from apscheduler.schedulers.background import BackgroundScheduler
 
 def get_holding_data():
@@ -17,7 +18,7 @@ def get_holding_data():
 		miner.write_holding_data_mysqldb()
 	
 	except Exception as e:
-		log(e)
+		log(str(e))
 
 	pass
 
@@ -30,7 +31,21 @@ def get_detail_data():
 		miner.get_detail_data()		
 	
 	except Exception as e:
-		log(e)
+		log(str(e))
+
+	pass
+
+
+def update_basic_data():
+
+	Lxr_adapter = Lixinger_adapter()
+
+	try:
+		#update volume and amount information
+		Lxr_adapter.update_fundamental_info_history()
+		
+	except Exception as e:
+		log(str(e))
 
 	pass
 
@@ -44,33 +59,19 @@ def update_holding_data():
 		data_proc.update_holding_detail()
 	
 	except Exception as e:
-		log(e)
+		log(str(e))
 
 	pass
 
-def test_get_holding_data():
+def update_basics():
 
-	#miner = HK_data_miner()
+	ts_adatper = Tushare_adapter()
 
-	#try:
-		#download
-	#save_cookie('')
-	#miner.get_detail_data_history('20170328', '20170430')
+	try:
+		ts_adatper.update_stock_basics()
 
-	#miner.get_amount_flow()
-	#miner.write_holding_data_mysqldb()
-	
-	#except Exception as e:
-		#log(e)
-
-	#data_proc = HK_data_processing()
-
-	#try:
-	#update volume and amount information
-	#data_proc.update_holding_detail()
-	
-	#except Exception as e:
-	#	log(e)
+	except Exception as e:
+		log(str(e))
 
 	pass
 
@@ -82,16 +83,22 @@ def get_HK_amount_top():
 	log('get_HK_amount_top not implemented')
 
 def jiatou():
-
-	clear_log()
 	
+	clear_log()
+	save_cookie('')
 	scheduleTask()
-
-	test_get_holding_data()
-
+	
 def scheduleTask():
 
 	sched = BackgroundScheduler()
+
+	#周一至周五对应 17点执行 更新数基本数据，每日执行一次
+	sched.add_job(
+		update_basics, 'cron', 
+		hour='17', 
+		minute='00', 
+		day_of_week ='0-5', 
+		timezone = 'Asia/Shanghai')
 
 	#周二至周六对应 5点执行 获取每日持仓数量情况，每日执行一次
 	sched.add_job(
@@ -109,6 +116,14 @@ def scheduleTask():
 		day_of_week ='1-6', 
 		timezone = 'Asia/Shanghai')
 
+	#LXR
+	'''
+	sched.add_job(
+		update_basic_data, 'cron', 
+		hour='23', 
+		minute='35', 
+		timezone = 'Asia/Shanghai')
+	'''
 	'''
 	#周一至周五对应 日9点半至11点半，13点至15点，获取资金流入流出，每秒执行一次
 	sched.add_job(

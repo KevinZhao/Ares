@@ -20,8 +20,8 @@ class HK_data_miner():
 	_eventvalidation = ''
 	_db = Jiatou_DB()._db
 	market_type_list = ['sz', 'sh']
-	_sleep_timer = 12
-	_retry_count = 5
+	_sleep_timer = 1
+	_retry_count = 20
 
 	#---For Holding Data-----#
 

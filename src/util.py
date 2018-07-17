@@ -51,8 +51,13 @@ def code_to_name(code):
     resultProxy=db.execute(
         text('select name from tb_basics where code = :code '), {'code':code})
     name = resultProxy.fetchall()
+
+    if len(name) > 0:
+        ret_name = name[0][0]
+    else:
+        ret_name = ''
     
-    return name[0][0]
+    return ret_name
 
 def name_to_code(name):
 
@@ -103,7 +108,7 @@ def read_cookie():
 
     return cookie
 
-def url_request_with_retry(url, parameters, retry_count, sleep_count):
+def url_request_with_retry(url, parameters, retry_count, sleep_timer):
 
     socket.setdefaulttimeout(15)
     
@@ -115,6 +120,8 @@ def url_request_with_retry(url, parameters, retry_count, sleep_count):
     data = data.encode('ascii')
 
     while attempts <= retry_count and not success:
+
+        time.sleep(sleep_timer)
 
         ua_list = [
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.6; rv2.0.1) Gecko/20100101 Firefox/4.0.1",
@@ -138,13 +145,12 @@ def url_request_with_retry(url, parameters, retry_count, sleep_count):
         request.add_header('User-Agent', user_agent)
         
         if cookie != "":
-            request.add_header('Cookie', cookie)
+           request.add_header('Cookie', cookie)
 
         request.add_header('Connection', connection)
         request.add_header('Host', host)
 
         try:
-            #log(url)
             response = urllib.request.urlopen(request, data)
             result = response.read().decode('utf-8')
             
@@ -158,8 +164,6 @@ def url_request_with_retry(url, parameters, retry_count, sleep_count):
 
             save_cookie(cookie)
             success = True
-
-            time.sleep(sleep_count)
 
         except urllib.error.HTTPError as e:
             log('urllib.error.HTTPError')
@@ -177,9 +181,6 @@ def url_request_with_retry(url, parameters, retry_count, sleep_count):
             attempts += 1
 
         except urllib.error.URLError as e:
-            #TimeoutError, [Errno 110] Connection timed out
-            #log(e.reason)
-            #print(e)
             log('urllib.error.URLError')
             attempts += 1
 
@@ -187,18 +188,71 @@ def url_request_with_retry(url, parameters, retry_count, sleep_count):
             log('socket.timeout')
             attempts += 1
 
-        except httplib.BadStatusLine as e:
-            log('http.client.BadStatusLine')
-            log(str(e))
-            attempts += 1
-
         except Exception as e:
-
             log(str(e))
             attempts += 1
 
         if attempts == retry_count + 1:
             log('[Fatal Error]' + url)
+
+        if attempts != 0:
+            time.sleep(attempts * 60)
+
+    return result
+
+def url_request_with_json_retry(url, json, retry_count, sleep_timer):
+
+    socket.setdefaulttimeout(15)
+    
+    attempts = 0
+    success = False
+    result = ''
+
+    while attempts <= retry_count and not success:
+
+        time.sleep(sleep_timer)
+
+        request = urllib.request.Request(url, method = 'POST')
+        request.add_header('Content-Type', 'application/json')
+
+        jsondataasbytes = json.encode('utf-8')   # needs to be bytes
+        request.add_header('Content-Length', len(jsondataasbytes))
+
+        try:
+            response = urllib.request.urlopen(request, jsondataasbytes)
+            result = response.read().decode('utf-8')
+            
+            response.close()
+            success = True
+
+        except urllib.error.HTTPError as e:
+            log('urllib.error.HTTPError')
+            log(str(e.code))
+            log(e.reason)
+            attempts += 1
+
+            continue
+        except ConnectionResetError as e:
+            log('ConnectionResetError')
+            attempts += 1
+
+        except urllib.error.URLError as e:
+            log('urllib.error.URLError')
+            attempts += 1
+
+        except socket.timeout:
+            log('socket.timeout')
+            attempts += 1
+
+        except Exception as e:
+            log(str(e))
+            attempts += 1
+
+        if attempts == retry_count + 1:
+            log('[Fatal Error]' + url)
+
+        if attempts != 0:
+            time.sleep(attempts * 60)
 
     return result
 
