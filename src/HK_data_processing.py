@@ -184,7 +184,7 @@ class HK_data_processing():
 
 		log('starting update_holding_detail')
 
-		#港股通代码转换
+		#check if there is NULL data
 		resultProxy = self._db.execute(text('select distinct no from tb_daily where amount_diff is NULL'))
 		no_result = resultProxy.fetchall()
 		resultProxy.close()
@@ -194,7 +194,7 @@ class HK_data_processing():
 
 		ts_adatper = Tushare_adapter()
 
-		#循环遍历求差值
+		#update holding detail
 		for no in no_result:
 
 			code = no_to_code(no[0])
@@ -209,7 +209,7 @@ class HK_data_processing():
 
 		pass
 
-	#---5/10/15/20 交易日持股变化----------------------------------------#
+	#---5/10/15/20 obsolete ? ----------------------------------------#
 	def update_period(self, period):
 
 		db = Jiatou_DB()._db
@@ -278,18 +278,21 @@ class HK_data_processing():
 
 		pass
 
+	def update_trend_history(self):
 
-	def update_trend_history(self, start_date):
+		resultProxy = self._db.execute(text('select distinct date from tb_daily order by date DESC'))
+		tb_daily_result = resultProxy.fetchall()
 
-		resultProxy = self._db.execute(text('select distinct date from tb_daily where date >= :date order by date DESC'),
-			{'date':start_date})
-		day_result = resultProxy.fetchall()
+		resultProxy = self._db.execute(text('select distinct date from tb_trend_test order by date DESC'))
+		tb_trend_result = resultProxy.fetchall()
 
-		for date in day_result:
-			self.update_trend(date[0])
+		#update trend 
+		for date in tb_daily_result:
 
-		pass
+			if date not in tb_trend_result:
+				self.update_trend(date[0])
 
+	#obsolete
 	def update_trend_last_day(self):
 
 		resultProxy = self._db.execute(text('select distinct date from tb_daily order by date DESC'))
@@ -297,9 +300,8 @@ class HK_data_processing():
 
 		self.update_trend(day_result[0][0])
 
-
-	#---持股历史高位筛选----------------------------------------#
-	def update_trend(self, currentDate = '2018-05-24'):
+	#---持股历史高位筛选-----------------------------------------------#
+	def update_trend(self, currentDate = '2018-08-14'):
 
 		db = Jiatou_DB()._db
 		tb_trend_df = pd.DataFrame(columns = 
@@ -316,6 +318,8 @@ class HK_data_processing():
 		resultProxy = self._db.execute(text('select distinct no from tb_daily'))
 		no_result = resultProxy.fetchall()
 		resultProxy.close()
+
+		print(currentDate)
 
 		#交易日期
 		resultProxy = self._db.execute(text(
@@ -374,7 +378,6 @@ class HK_data_processing():
 				amount_diff = Decimal(amount_diff).quantize(Decimal('0.00'))
 
 				#percent_diff
-
 				if len(result) > 1:
 					percent_diff = result[0][self._tb_daily['Percent']] - result[1][self._tb_daily['Percent']]
 					percent_diff = Decimal(percent_diff).quantize(Decimal('0.00'))
@@ -388,7 +391,6 @@ class HK_data_processing():
 					percent_diff_5 = Decimal(percent_diff_5).quantize(Decimal('0.00'))
 
 					amount_diff_5 = 0.00
-					#print(name)
 					for i in range(0, 5):
 						amount_diff_5 = amount_diff_5 + result[i][self._tb_daily['Amount_diff']]
 						pass
@@ -438,27 +440,27 @@ class HK_data_processing():
 			
 
 			#当前值距离历史最高95%以上
-			if quantile >= 0.95:
-				record = []
+			#if quantile >= 0.98:
+			record = []
 
-				record.append(code)
-				record.append(name)
-				record.append(percent)
-				record.append(max_percent)
-				record.append(quantile)
-				record.append(amount_diff)
-				record.append(percent_diff)	
-				record.append(amount_diff_5)			
-				record.append(percent_diff_5)
-				record.append(amount_diff_10)				
-				record.append(percent_diff_10)
-				record.append(amount_diff_20)				
-				record.append(percent_diff_20)				
-				record.append(currentDate)
+			record.append(code)
+			record.append(name)
+			record.append(percent)
+			record.append(max_percent)
+			record.append(quantile)
+			record.append(amount_diff)
+			record.append(percent_diff)	
+			record.append(amount_diff_5)			
+			record.append(percent_diff_5)
+			record.append(amount_diff_10)				
+			record.append(percent_diff_10)
+			record.append(amount_diff_20)				
+			record.append(percent_diff_20)				
+			record.append(currentDate)
 
-				tb_trend_df.loc[tb_trend_df.shape[0]+1] = record
+			tb_trend_df.loc[tb_trend_df.shape[0]+1] = record
 
-		tb_trend_df.to_sql('tb_trend', con=db, if_exists='append', index=False)
+		tb_trend_df.to_sql('tb_trend_test', con=db, if_exists='append', index=False)
 
 		print('done')
 

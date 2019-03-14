@@ -40,7 +40,7 @@ class HK_data_miner():
 		history_y = time.strftime('%Y', date.timetuple());
 		history_m = time.strftime('%m', date.timetuple());
 		history_d = time.strftime('%d', date.timetuple());
-		hold_date = time.strftime('%d%m%Y', date.timetuple())
+		hold_date = time.strftime('%Y%m%d', date.timetuple())
 		week_day = time.strftime("%w", date.timetuple())
 
 		#周日，周一不取数据
@@ -76,12 +76,16 @@ class HK_data_miner():
 			    '__VIEWSTATE': self._viewstate,
 			    '__VIEWSTATEGENERATOR': self._viewgenerator,
 			    '__EVENTVALIDATION':self._eventvalidation,
-			    'today':'20171119',
-			    'ddlShareholdingDay':history_d,
-			    'ddlShareholdingMonth':history_m,
-			    'ddlShareholdingYear':history_y,
+			    'today':'20190307',
+			    'sortBy':'stockcode',
+			    'sortByDirection':'asc',
+			    #'ddlShareholdingDay':history_d,
+			    #'ddlShareholdingMonth':history_m,
+			    #'ddlShareholdingYear':history_y,
+			    'txtShareholdingDate':history_y + '/' + history_m + '/' + history_d,
 			    'btnSearch.x' :'37',
-			    'btnSearch.y' :'12'
+			    'btnSearch.y' :'12',
+			    'btnSearch' : '搜寻'
 			}
 
 			result = url_request_with_retry(url, parameters, self._retry_count, self._sleep_timer)
@@ -118,47 +122,76 @@ class HK_data_miner():
 
 			time.sleep(1)
 
+
+#---------------------------------------------------------------------------------------#
+		#处理html并转换成csv
+		#<tr>
+		#    <td class="col-stock-code">
+		#        <div class="mobile-list-heading">股份代号:</div>
+		#        <div class="mobile-list-body">93997</div>
+		#    </td>
+		#    <td class="col-stock-name">
+		#        <div class="mobile-list-heading">股份名称:</div>
+		#        <div class="mobile-list-body">继峰股份</div>
+		#    </td>
+		#    <td class="col-shareholding">
+		#        <div class="mobile-list-heading">于中央结算系统的持股量:</div>
+		#        <div class="mobile-list-body">2,327,341</div>
+		#    </td>
+		#    <td class="col-shareholding-percent">
+		#        <div class="mobile-list-heading">占于上交所上市及交易的A股总数的百分比:</div>
+		#        <div class="mobile-list-body">0.36%</div>
+		#    </td>
+		#</tr>
+#---------------------------------------------------------------------------------------#
 	def save_holding_data_csv(self, html, filename, hold_date):
-	    #log(html)
+
+	    log('save_holding_data_csv called')
     
 	    df = pd.DataFrame(columns = ['No', 'Name', 'Volume', 'Percent'])
 	   
 	    soup = BeautifulSoup(html, "html5lib")
-	    
-	    holding = soup.find('div', {'style':'margin: 20px 0 0 10px; font-weight: bold; text-decoration: underline;'})
+	   
+	    holding = soup.find('span', {'style':'text-decoration:underline;'})
 	    holding_date = holding.string
 	    holding_date = re.sub("\D", "", holding_date) 
 
 	    if holding_date != hold_date:
 	        return
-	    
+
 	    #寻找Table
-	    tr_list = soup.findAll('tr', {"class":'row0'})
+	    tr_list = soup.findAll('tr')
+
 	    #处理数据
 	    for tr in tr_list:
-	        record = []
-	        for child in tr.children:
-	            str = child.string.replace('\n','')
-	            str = str.replace(' ','')
-	            if str != '':
-	                record.append(str)
-	        df.loc[df.shape[0]+1] = record
-	        
-	    tr_list = soup.findAll('tr', {"class":'row1'})
-	    #处理数据
-	    for tr in tr_list:
-	        record = []
-	        for child in tr.children:
-	            str = child.string.replace('\n','')
-	            str = str.replace(' ','')
-	            if str != '':
-	                record.append(str)
-	        df.loc[df.shape[0]+1] = record
-	        
+
+	    	#取得TR数据，排除异常数据
+	        code = tr.find('td', {'class':'col-stock-code'})
+	        if code != None:
+
+	        	record = []
+
+	        	result_list = tr.findAll('div', {'class':'mobile-list-body'})
+
+	        	for result in result_list:
+
+	        		#20190118 线上脏数据
+	        		if result.string == None:
+	        			result.string = '0.00%'
+
+	        		#去除空格和换行符号
+	        		value = result.string.replace('\n', '')
+	        		value = value.replace(' ','')
+
+	        		if value != '':
+	        			record.append(value)
+	        	#存入df
+	        	df.loc[df.shape[0]+1] = record
+
 	    df = df.set_index('No')
 	    df.to_csv(filename, encoding='gbk')
 
-	    #log('save to ', filename)
+	    log('save to %s' % filename)
 	    return
 
 	def write_holding_data_mysqldb(self):

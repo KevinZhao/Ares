@@ -15,6 +15,7 @@ def get_holding_data():
 	try:
 		#download
 		miner.get_holding_data()
+		#miner.get_holding_data_history('20190129', '20190313')
 		miner.write_holding_data_mysqldb()
 	
 	except Exception as e:
@@ -57,6 +58,7 @@ def update_holding_data():
 	try:
 		#update volume and amount information
 		data_proc.update_holding_detail()
+		data_proc.update_trend_history()
 	
 	except Exception as e:
 		log(str(e))
@@ -86,7 +88,9 @@ def jiatou():
 	
 	clear_log()
 	save_cookie('')
-	scheduleTask()
+	#scheduleTask()
+	update_holding_data()
+	#get_holding_data()
 	
 def scheduleTask():
 
